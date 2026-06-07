@@ -14,25 +14,18 @@
     </div>
 
     <div class="card">
-      <h2>API Key de Finnhub</h2>
+      <h2>URL del proxy (Cloudflare Worker)</h2>
       <p class="hint">
-        Obtén tu API key gratuita en
-        <a href="https://finnhub.io/register" target="_blank">finnhub.io/register</a>.
-        El plan gratuito incluye 60 llamadas/minuto.
+        Ingresá la URL de tu Worker desplegado. La API key de Finnhub vive encriptada en Cloudflare
+        y nunca llega a la extensión ni al dispositivo del usuario.
       </p>
       <div class="field-group">
-        <input
-          type="password"
-          id="inputApiKey"
-          placeholder="Pega tu API key aquí..."
-          autocomplete="off"
-        />
-        <button id="btnToggleVisibility" class="btn-icon">👁️</button>
+        <input type="text" id="inputProxyUrl" placeholder="https://stock-alerts-proxy.tu-subdominio.workers.dev" />
       </div>
-      <div id="apiStatus" class="status-msg hidden"></div>
+      <div id="proxyStatus" class="status-msg hidden"></div>
       <div class="actions">
-        <button id="btnSaveKey" class="btn-primary">Guardar API Key</button>
-        <button id="btnTestKey" class="btn-secondary">Verificar conexión</button>
+        <button id="btnSaveProxy" class="btn-primary">Guardar URL</button>
+        <button id="btnTestProxy" class="btn-secondary">Verificar conexión</button>
       </div>
     </div>
 
@@ -40,7 +33,7 @@
       <h2>Configuración de polling</h2>
       <p class="hint">Frecuencia con la que se verifican las alertas.</p>
       <div class="option-row">
-        <label for="selectInterval">Intervalo de revisión:</label>
+        <label>Intervalo de revisión:</label>
         <select id="selectInterval">
           <option value="0.5">Cada 30 segundos</option>
           <option value="1">Cada 1 minuto</option>
@@ -49,7 +42,7 @@
         </select>
       </div>
       <div class="option-row">
-        <label for="selectCooldown">Cooldown entre alertas repetidas:</label>
+        <label>Cooldown entre alertas repetidas:</label>
         <select id="selectCooldown">
           <option value="5">5 minutos</option>
           <option value="15">15 minutos</option>

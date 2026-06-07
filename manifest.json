@@ -9,7 +9,7 @@
     "alarms"
   ],
   "host_permissions": [
-    "https://finnhub.io/*"
+    "https://*.workers.dev/*"
   ],
   "background": {
     "service_worker": "background.js"

@@ -1,0 +1,7 @@
+name = "stock-alerts-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+# FINNHUB_API_KEY se define como secret (nunca en texto plano aquí)
+# Ejecutar: wrangler secret put FINNHUB_API_KEY

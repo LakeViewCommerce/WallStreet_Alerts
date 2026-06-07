@@ -1,9 +1,13 @@
-// Service worker: fetches quotes, calculates indicators, fires notifications
+// Service worker: fetches quotes via Cloudflare Worker proxy (API key stored as CF secret)
 
-const FINNHUB_BASE = 'https://finnhub.io/api/v1';
-const POLL_INTERVAL_MINUTES = 0.5; // every 30 seconds
+const POLL_INTERVAL_MINUTES = 0.5;
 
-// ── Alarm setup ──────────────────────────────────────────────────────────────
+async function getProxyBase() {
+  const { proxyUrl } = await chrome.storage.sync.get('proxyUrl');
+  return proxyUrl ? proxyUrl.replace(/\/$/, '') : null;
+}
+
+// ── Alarm setup ───────────────────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create('pollAlerts', { periodInMinutes: POLL_INTERVAL_MINUTES });
@@ -13,7 +17,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'pollAlerts') checkAllAlerts();
 });
 
-// Also check on startup
 chrome.runtime.onStartup.addListener(() => {
   chrome.alarms.create('pollAlerts', { periodInMinutes: POLL_INTERVAL_MINUTES });
   checkAllAlerts();
@@ -22,10 +25,11 @@ chrome.runtime.onStartup.addListener(() => {
 // ── Main polling loop ─────────────────────────────────────────────────────────
 
 async function checkAllAlerts() {
-  const { apiKey, alerts } = await chrome.storage.sync.get(['apiKey', 'alerts']);
-  if (!apiKey || !alerts || alerts.length === 0) return;
+  const { alerts } = await chrome.storage.sync.get('alerts');
+  if (!alerts || alerts.length === 0) return;
+  const base = await getProxyBase();
+  if (!base) return; // Worker URL not configured yet
 
-  // Group alerts by symbol to minimize API calls
   const bySymbol = {};
   for (const alert of alerts) {
     if (!alert.enabled) continue;
@@ -35,54 +39,42 @@ async function checkAllAlerts() {
 
   for (const [symbol, symbolAlerts] of Object.entries(bySymbol)) {
     try {
-      const quote = await fetchQuote(apiKey, symbol);
+      const quote = await fetchQuote(base, symbol);
       if (!quote) continue;
-
-      // Save latest price for popup display
       await saveQuoteCache(symbol, quote);
-
-      for (const alert of symbolAlerts) {
-        await evaluateAlert(apiKey, alert, quote);
-      }
+      for (const alert of symbolAlerts) await evaluateAlert(base, alert, quote);
     } catch (e) {
       console.error(`Error processing ${symbol}:`, e);
     }
   }
 }
 
-// ── API helpers ───────────────────────────────────────────────────────────────
+// ── API helpers (sin API key — el Worker la inyecta) ─────────────────────────
 
-async function fetchQuote(apiKey, symbol) {
-  const res = await fetch(`${FINNHUB_BASE}/quote?symbol=${symbol}&token=${apiKey}`);
+async function fetchQuote(base, symbol) {
+  const res = await fetch(`${base}/quote?symbol=${symbol}`);
   if (!res.ok) return null;
-  const data = await res.json();
-  // c=current, h=high, l=low, o=open, pc=prev close, dp=% change, v=volume (not in quote)
-  return data;
+  return res.json();
 }
 
-async function fetchCandles(apiKey, symbol, resolution = 'D', count = 50) {
+async function fetchCandles(base, symbol, resolution = 'D', count = 50) {
   const to = Math.floor(Date.now() / 1000);
   const from = to - count * 24 * 3600;
-  const res = await fetch(
-    `${FINNHUB_BASE}/stock/candle?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${to}&token=${apiKey}`
-  );
+  const res = await fetch(`${base}/candle?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${to}`);
   if (!res.ok) return null;
   const data = await res.json();
   if (data.s !== 'ok') return null;
-  return data; // { c, h, l, o, v, t }
+  return data;
 }
 
-async function fetchVolume(apiKey, symbol) {
-  // Use 1-minute candles for today's latest volume
+async function fetchVolume(base, symbol) {
   const to = Math.floor(Date.now() / 1000);
-  const from = to - 3600; // last hour
-  const res = await fetch(
-    `${FINNHUB_BASE}/stock/candle?symbol=${symbol}&resolution=1&from=${from}&to=${to}&token=${apiKey}`
-  );
+  const from = to - 3600;
+  const res = await fetch(`${base}/candle?symbol=${symbol}&resolution=1&from=${from}&to=${to}`);
   if (!res.ok) return null;
   const data = await res.json();
   if (data.s !== 'ok' || !data.v || data.v.length === 0) return null;
-  return data.v.reduce((a, b) => a + b, 0); // total volume in last hour
+  return data.v.reduce((a, b) => a + b, 0);
 }
 
 // ── Indicator calculations ────────────────────────────────────────────────────
@@ -92,23 +84,18 @@ function calcRSI(closes, period = 14) {
   let gains = 0, losses = 0;
   for (let i = closes.length - period; i < closes.length; i++) {
     const diff = closes[i] - closes[i - 1];
-    if (diff > 0) gains += diff;
-    else losses += Math.abs(diff);
+    if (diff > 0) gains += diff; else losses += Math.abs(diff);
   }
-  const avgGain = gains / period;
   const avgLoss = losses / period;
   if (avgLoss === 0) return 100;
-  const rs = avgGain / avgLoss;
-  return 100 - 100 / (1 + rs);
+  return 100 - 100 / (1 + (gains / period) / avgLoss);
 }
 
 function calcEMA(values, period) {
   if (values.length < period) return null;
   const k = 2 / (period + 1);
   let ema = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
-  for (let i = period; i < values.length; i++) {
-    ema = values[i] * k + ema * (1 - k);
-  }
+  for (let i = period; i < values.length; i++) ema = values[i] * k + ema * (1 - k);
   return ema;
 }
 
@@ -116,9 +103,6 @@ function calcMACD(closes) {
   const ema12 = calcEMA(closes, 12);
   const ema26 = calcEMA(closes, 26);
   if (ema12 === null || ema26 === null) return null;
-  const macdLine = ema12 - ema26;
-
-  // Signal line: EMA-9 of MACD values (simplified: use last 9 daily MACDs)
   const macdValues = [];
   for (let i = 26; i <= closes.length; i++) {
     const e12 = calcEMA(closes.slice(0, i), 12);
@@ -126,90 +110,57 @@ function calcMACD(closes) {
     if (e12 !== null && e26 !== null) macdValues.push(e12 - e26);
   }
   const signal = calcEMA(macdValues, 9);
+  const macdLine = ema12 - ema26;
   return { macd: macdLine, signal, histogram: signal !== null ? macdLine - signal : null };
 }
 
 // ── Alert evaluation ──────────────────────────────────────────────────────────
 
-async function evaluateAlert(apiKey, alert, quote) {
-  const { c: price, dp: changePercent, pc: prevClose } = quote;
+async function evaluateAlert(base, alert, quote) {
+  const { c: price, dp: changePercent } = quote;
   const now = Date.now();
-
-  // Cooldown: don't re-fire same alert within 5 minutes
   const cooldownKey = `cooldown_${alert.id}`;
   const stored = await chrome.storage.local.get(cooldownKey);
   if (stored[cooldownKey] && now - stored[cooldownKey] < 5 * 60 * 1000) return;
 
-  let triggered = false;
-  let message = '';
+  let triggered = false, message = '';
 
   switch (alert.type) {
     case 'price_above':
-      if (price >= alert.value) {
-        triggered = true;
-        message = `${alert.symbol} superó $${alert.value} → Precio actual: $${price.toFixed(2)}`;
-      }
+      if (price >= alert.value) { triggered = true; message = `${alert.symbol} superó $${alert.value} → Precio actual: $${price.toFixed(2)}`; }
       break;
-
     case 'price_below':
-      if (price <= alert.value) {
-        triggered = true;
-        message = `${alert.symbol} bajó de $${alert.value} → Precio actual: $${price.toFixed(2)}`;
-      }
+      if (price <= alert.value) { triggered = true; message = `${alert.symbol} bajó de $${alert.value} → Precio actual: $${price.toFixed(2)}`; }
       break;
-
     case 'change_above':
-      if (changePercent >= alert.value) {
-        triggered = true;
-        message = `${alert.symbol} subió +${changePercent.toFixed(2)}% hoy (umbral: +${alert.value}%)`;
-      }
+      if (changePercent >= alert.value) { triggered = true; message = `${alert.symbol} subió +${changePercent.toFixed(2)}% hoy (umbral: +${alert.value}%)`; }
       break;
-
     case 'change_below':
-      if (changePercent <= -Math.abs(alert.value)) {
-        triggered = true;
-        message = `${alert.symbol} cayó ${changePercent.toFixed(2)}% hoy (umbral: -${alert.value}%)`;
-      }
+      if (changePercent <= -Math.abs(alert.value)) { triggered = true; message = `${alert.symbol} cayó ${changePercent.toFixed(2)}% hoy (umbral: -${alert.value}%)`; }
       break;
-
     case 'volume': {
-      const volume = await fetchVolume(apiKey, alert.symbol);
-      if (volume !== null && volume >= alert.value) {
-        triggered = true;
-        message = `${alert.symbol} volumen inusual: ${formatVolume(volume)} en la última hora`;
-      }
+      const volume = await fetchVolume(base, alert.symbol);
+      if (volume !== null && volume >= alert.value) { triggered = true; message = `${alert.symbol} volumen inusual: ${formatVolume(volume)} en la última hora`; }
       break;
     }
-
     case 'rsi': {
-      const candles = await fetchCandles(apiKey, alert.symbol, 'D', 30);
+      const candles = await fetchCandles(base, alert.symbol, 'D', 30);
       if (candles) {
         const rsi = calcRSI(candles.c);
         if (rsi !== null) {
-          if (alert.rsiCondition === 'overbought' && rsi >= alert.value) {
-            triggered = true;
-            message = `${alert.symbol} RSI sobrecomprado: ${rsi.toFixed(1)} (umbral: ${alert.value})`;
-          } else if (alert.rsiCondition === 'oversold' && rsi <= alert.value) {
-            triggered = true;
-            message = `${alert.symbol} RSI sobrevendido: ${rsi.toFixed(1)} (umbral: ${alert.value})`;
-          }
+          if (alert.rsiCondition === 'overbought' && rsi >= alert.value) { triggered = true; message = `${alert.symbol} RSI sobrecomprado: ${rsi.toFixed(1)} (umbral: ${alert.value})`; }
+          else if (alert.rsiCondition === 'oversold' && rsi <= alert.value) { triggered = true; message = `${alert.symbol} RSI sobrevendido: ${rsi.toFixed(1)} (umbral: ${alert.value})`; }
         }
       }
       break;
     }
-
     case 'macd': {
-      const candles = await fetchCandles(apiKey, alert.symbol, 'D', 50);
+      const candles = await fetchCandles(base, alert.symbol, 'D', 50);
       if (candles) {
         const result = calcMACD(candles.c);
         if (result && result.histogram !== null) {
-          if (alert.macdSignal === 'bullish' && result.macd > result.signal) {
-            triggered = true;
-            message = `${alert.symbol} cruce MACD alcista → MACD: ${result.macd.toFixed(3)}, Señal: ${result.signal.toFixed(3)}`;
-          } else if (alert.macdSignal === 'bearish' && result.macd < result.signal) {
-            triggered = true;
-            message = `${alert.symbol} cruce MACD bajista → MACD: ${result.macd.toFixed(3)}, Señal: ${result.signal.toFixed(3)}`;
-          }
+          if (alert.macdSignal === 'bullish' && result.macd > result.signal) { triggered = true; message = `${alert.symbol} cruce MACD alcista → MACD: ${result.macd.toFixed(3)}, Señal: ${result.signal.toFixed(3)}`; }
+          else if (alert.macdSignal === 'bearish' && result.macd < result.signal) { triggered = true; message = `${alert.symbol} cruce MACD bajista → MACD: ${result.macd.toFixed(3)}, Señal: ${result.signal.toFixed(3)}`; }
         }
       }
       break;
@@ -239,13 +190,8 @@ function formatVolume(v) {
 }
 
 async function saveQuoteCache(symbol, quote) {
-  const cacheKey = `cache_${symbol}`;
-  await chrome.storage.local.set({
-    [cacheKey]: { ...quote, updatedAt: Date.now() }
-  });
+  await chrome.storage.local.set({ [`cache_${symbol}`]: { ...quote, updatedAt: Date.now() } });
 }
-
-// ── Message handler (from popup) ──────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'forceCheck') {
