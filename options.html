@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stock Alerts – Configuración</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="logo">📈</span>
+      <h1>Stock Market Alerts</h1>
+      <span class="subtitle">Configuración</span>
+    </div>
+
+    <div class="card">
+      <h2>API Key de Finnhub</h2>
+      <p class="hint">
+        Obtén tu API key gratuita en
+        <a href="https://finnhub.io/register" target="_blank">finnhub.io/register</a>.
+        El plan gratuito incluye 60 llamadas/minuto.
+      </p>
+      <div class="field-group">
+        <input
+          type="password"
+          id="inputApiKey"
+          placeholder="Pega tu API key aquí..."
+          autocomplete="off"
+        />
+        <button id="btnToggleVisibility" class="btn-icon">👁️</button>
+      </div>
+      <div id="apiStatus" class="status-msg hidden"></div>
+      <div class="actions">
+        <button id="btnSaveKey" class="btn-primary">Guardar API Key</button>
+        <button id="btnTestKey" class="btn-secondary">Verificar conexión</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Configuración de polling</h2>
+      <p class="hint">Frecuencia con la que se verifican las alertas.</p>
+      <div class="option-row">
+        <label for="selectInterval">Intervalo de revisión:</label>
+        <select id="selectInterval">
+          <option value="0.5">Cada 30 segundos</option>
+          <option value="1">Cada 1 minuto</option>
+          <option value="2">Cada 2 minutos</option>
+          <option value="5">Cada 5 minutos</option>
+        </select>
+      </div>
+      <div class="option-row">
+        <label for="selectCooldown">Cooldown entre alertas repetidas:</label>
+        <select id="selectCooldown">
+          <option value="5">5 minutos</option>
+          <option value="15">15 minutos</option>
+          <option value="30">30 minutos</option>
+          <option value="60">1 hora</option>
+        </select>
+      </div>
+      <button id="btnSaveSettings" class="btn-primary">Guardar configuración</button>
+    </div>
+
+    <div class="card">
+      <h2>Datos</h2>
+      <div class="actions">
+        <button id="btnExport" class="btn-secondary">Exportar alertas</button>
+        <button id="btnImport" class="btn-secondary">Importar alertas</button>
+        <button id="btnClearAll" class="btn-danger">Borrar todo</button>
+      </div>
+      <input type="file" id="fileImport" accept=".json" class="hidden" />
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

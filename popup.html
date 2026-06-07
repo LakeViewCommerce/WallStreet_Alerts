@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Alerts</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <span class="logo">📈</span>
+      <span class="title">Stock Alerts</span>
+    </div>
+    <div class="header-right">
+      <button id="btnOptions" class="icon-btn" title="Configuración">⚙️</button>
+      <button id="btnRefresh" class="icon-btn" title="Actualizar ahora">🔄</button>
+    </div>
+  </div>
+
+  <div id="noApiKey" class="banner banner-warn hidden">
+    ⚠️ Configura tu API key de Finnhub en <a href="#" id="linkOptions">Opciones</a>.
+  </div>
+
+  <!-- Add alert form -->
+  <div class="section">
+    <div class="section-title">Nueva alerta</div>
+    <div class="form-row">
+      <input type="text" id="inputSymbol" placeholder="Símbolo (ej: AAPL)" maxlength="10" />
+      <select id="selectType">
+        <option value="price_above">Precio ≥</option>
+        <option value="price_below">Precio ≤</option>
+        <option value="change_above">Variación % ≥</option>
+        <option value="change_below">Caída % ≥</option>
+        <option value="volume">Volumen/hora ≥</option>
+        <option value="rsi">RSI</option>
+        <option value="macd">MACD</option>
+      </select>
+    </div>
+
+    <div id="paramPrice" class="param-group">
+      <input type="number" id="inputValue" placeholder="Valor" step="0.01" min="0" />
+    </div>
+
+    <div id="paramRsi" class="param-group hidden">
+      <select id="selectRsiCondition">
+        <option value="overbought">Sobrecomprado (RSI ≥)</option>
+        <option value="oversold">Sobrevendido (RSI ≤)</option>
+      </select>
+      <input type="number" id="inputRsiValue" placeholder="Nivel RSI (ej: 70)" min="1" max="99" />
+    </div>
+
+    <div id="paramMacd" class="param-group hidden">
+      <select id="selectMacdSignal">
+        <option value="bullish">Cruce alcista (MACD > Señal)</option>
+        <option value="bearish">Cruce bajista (MACD < Señal)</option>
+      </select>
+    </div>
+
+    <button id="btnAddAlert" class="btn-primary">+ Agregar alerta</button>
+    <div id="formError" class="error-msg hidden"></div>
+  </div>
+
+  <!-- Alerts list -->
+  <div class="section">
+    <div class="section-title">Alertas activas <span id="alertCount" class="badge">0</span></div>
+    <div id="alertsList" class="alerts-list">
+      <div class="empty-state">No hay alertas configuradas.</div>
+    </div>
+  </div>
+
+  <!-- Prices cache -->
+  <div class="section">
+    <div class="section-title">Precios recientes</div>
+    <div id="pricesList" class="prices-list">
+      <div class="empty-state">Sin datos aún.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button id="btnTest" class="btn-secondary">Probar notificación</button>
+    <span class="version">v1.0.0</span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
