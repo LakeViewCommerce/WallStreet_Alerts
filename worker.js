@@ -26,7 +26,6 @@ export default {
     }
 
     params.set('token', env.FINNHUB_API_KEY);
-    const upstream = `${FINNHUB}/stock/${endpoint === 'quote' ? '../quote' : 'candle'}?${params}`;
     const finnhubUrl = endpoint === 'quote'
       ? `${FINNHUB}/quote?${params}`
       : `${FINNHUB}/stock/candle?${params}`;
