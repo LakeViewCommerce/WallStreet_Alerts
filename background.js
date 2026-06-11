@@ -1,10 +1,11 @@
 // Service worker: fetches quotes via Cloudflare Worker proxy (API key stored as CF secret)
 
 const POLL_INTERVAL_MINUTES = 0.5;
+const DEFAULT_PROXY_URL = 'https://stock-alerts-proxy.lakeviewmiami.workers.dev';
 
 async function getProxyBase() {
   const { proxyUrl } = await chrome.storage.sync.get('proxyUrl');
-  return proxyUrl ? proxyUrl.replace(/\/$/, '') : null;
+  return (proxyUrl ? proxyUrl.replace(/\/$/, '') : null) || DEFAULT_PROXY_URL;
 }
 
 // ── Alarm setup ───────────────────────────────────────────────────────────────

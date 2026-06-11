@@ -43,8 +43,7 @@ async function loadPrices() {
 }
 
 async function checkApiKey() {
-  const { proxyUrl } = await chrome.storage.sync.get('proxyUrl');
-  document.getElementById('noProxyUrl').classList.toggle('hidden', !!proxyUrl);
+  document.getElementById('noProxyUrl').classList.add('hidden');
 }
 
 // ── Events ────────────────────────────────────────────────────────────────────
