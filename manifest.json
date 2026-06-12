@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Stock Market Alerts",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Alertas en tiempo real de la bolsa NYSE/NASDAQ con Finnhub",
   "permissions": [
     "notifications",

@@ -177,7 +177,7 @@ async function evaluateAlert(base, alert, quote) {
 function sendNotification(symbol, message) {
   chrome.notifications.create(`alert_${symbol}_${Date.now()}`, {
     type: 'basic',
-    iconUrl: 'icons/icon128.png',
+    iconUrl: 'icons/icon128.jpg',
     title: `📈 Alerta: ${symbol}`,
     message,
     priority: 2
